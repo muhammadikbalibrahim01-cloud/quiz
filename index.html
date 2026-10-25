@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuizKita - Kuis Harian</title>
+<style>
+:root {
+  --ungu:#5b4bdb;
+  --muda:#e9e7ff;
+  --bg:#f5f6fc;
+  --teks:#20213d;
+}
+*{box-sizing:border-box}
+html,body{
+  margin:0;width:100%;height:100%;
+  overflow:hidden;font-family:Arial,sans-serif;
+  background:var(--bg);color:var(--teks)
+}
+header{
+  height:55px;background:var(--ungu);color:white;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px;font-weight:bold
+}
+header span{color:#ffe08a}
+main{
+  height:calc(100dvh - 55px);
+  display:grid;place-items:center;padding:10px
+}
+.screen{
+  display:none;width:min(800px,100%);
+  max-height:100%;overflow:auto;background:white;
+  border-radius:20px;padding:24px;
+  box-shadow:0 8px 30px #0000000c
+}
+.active{display:block}
+.center{text-align:center}
+.emoji{font-size:50px}
+h1{font-size:clamp(25px,5vw,38px);margin:15px 0}
+p{color:#666981;line-height:1.5}
+.notice{
+  background:var(--muda);padding:14px;
+  border-radius:12px;margin:18px 0;text-align:left
+}
+button{
+  font-size:15px;font-weight:bold;border:0;
+  border-radius:11px;padding:12px 16px;cursor:pointer
+}
+.primary{background:var(--ungu);color:white}
+.secondary{background:var(--muda);color:#29205e}
+.grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;margin-top:20px
+}
+.subject{
+  display:flex;align-items:center;gap:10px;
+  background:white;border:1px solid #ddd;
+  text-align:left;color:var(--teks)
+}
+.subject:hover{border-color:var(--ungu)}
+.subject .icon{font-size:25px}
+.subject small{display:block;color:#777;margin-top:5px}
+.top{
+  display:flex;justify-content:space-between;
+  gap:10px;align-items:center
+}
+.pill{background:var(--muda);padding:8px;border-radius:20px}
+.progress{
+  height:7px;background:#eee;border-radius:10px;
+  margin:20px 0;overflow:hidden
+}
+.fill{height:100%;width:0;background:var(--ungu)}
+.question{font-size:22px;line-height:1.4}
+.answers{display:grid;gap:10px}
+.answer{
+  background:white;border:1px solid #ddd;
+  text-align:left;color:var(--teks)
+}
+.answer:disabled{cursor:default}
+.correct{background:#d9f8e7!important;border-color:#20a56b!important}
+.wrong{background:#ffe4e6!important;border-color:#e05a67!important}
+.feedback{
+  display:none;background:var(--muda);
+  padding:12px;border-radius:10px;margin-top:12px
+}
+.feedback.show{display:block}
+.actions{
+  display:flex;justify-content:flex-end;
+  margin-top:18px
+}
+.score{font-size:48px;font-weight:bold;color:var(--ungu)}
+@media(max-width:450px){
+  .screen{padding:16px}
+  .grid{gap:7px}
+  .subject{padding:10px;font-size:13px}
+  .subject .icon{font-size:21px}
+  .question{font-size:19px}
+  button{padding:11px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>✦ Quiz<span>Kita</span></div>
+  <div>Belajar jadi seru ✨</div>
+</header>
+
+<main>
+<section class="screen active center" id="welcome">
+  <div class="emoji">🧠✨</div>
+  <p>KUIS INTERAKTIF HARIAN</p>
+  <h1>Mau coba quiz?</h1>
+  <p>Pilih mata pelajaran dan jawab 10 soal.</p>
+  <div class="notice">
+    🔔 <b>Soal diperbarui setiap hari!</b><br>
+    Urutan soal dan pilihan jawaban berubah berdasarkan tanggal.
+  </div>
+  <button class="primary" onclick="showSubjects()">Pilih Mata Pelajaran →</button>
+</section>
+
+<section class="screen" id="subjects">
+  <p>📚 PILIH MAPEL</p>
+  <h1>Mau belajar apa?</h1>
+  <p>Pilih satu mapel untuk memulai kuis.</p>
+  <div class="grid" id="subjectGrid"></div>
+  <br>
+  <button class="secondary" onclick="showPage('welcome')">← Kembali</button>
+</section>
+
+<section class="screen" id="quiz">
+  <div class="top">
+    <span class="pill" id="subjectName"></span>
+    <span id="count">Soal 1 dari 10</span>
+  </div>
+  <div class="progress"><div class="fill" id="fill"></div></div>
+  <h2 class="question" id="question"></h2>
+  <div class="answers" id="answers"></div>
+  <div class="feedback" id="feedback"></div>
+  <div class="actions">
+    <button class="primary" id="next" disabled>Selanjutnya →</button>
+  </div>
+</section>
+
+<section class="screen center" id="result">
+  <div class="emoji" id="trophy">🏆</div>
+  <p>HASIL KUIS</p>
+  <h1 id="resultTitle">Kuis selesai!</h1>
+  <div class="score" id="score">0/100</div>
+  <p id="resultText"></p>
+  <button class="primary" onclick="retryQuiz()">Ulangi Mapel Ini ↻</button>
+  <button class="secondary" onclick="showSubjects()">Pilih Mapel Lain</button>
+</section>
+</main>
+
+<script>
+const subjects = [
+{
+ name:"Bahasa Inggris",icon:"🇬🇧",
+ questions:[
+ ["What is the meaning of apple?",["Apel","Jeruk","Pisang","Mangga"],0],
+ ["Greeting in the morning?",["Good night","Good morning","Goodbye","Good evening"],1],
+ ["Plural of book?",["Bookes","Bookies","Books","Book"],2],
+ ["I am a student artinya?",["Saya guru","Saya siswa","Saya tidur","Saya makan"],1],
+ ["Opposite of big?",["Tall","Long","Small","High"],2],
+ ["She ___ my sister.",["Am","Are","Is","Be"],2],
+ ["After Monday is...",["Sunday","Tuesday","Friday","Saturday"],1],
+ ["Color of a clear sky?",["Blue","Green","Black","Pink"],0],
+ ["Terima kasih dalam bahasa Inggris?",["Sorry","Please","Thank you","Excuse me"],2],
+ ["Cat artinya...",["Anjing","Kucing","Burung","Kelinci"],1]
+ ]
+},
+{
+ name:"Bahasa Indonesia",icon:"📖",
+ questions:[
+ ["Gagasan utama paragraf disebut...",["Kalimat tanya","Ide pokok","Kata hubung","Amanat"],1],
+ ["Sinonim indah adalah...",["Elok","Buruk","Kotor","Bising"],0],
+ ["Antonim tinggi adalah...",["Lebar","Panjang","Rendah","Besar"],2],
+ ["Kalimat tanya diakhiri dengan...",["Titik","Koma","Tanda seru","Tanda tanya"],3],
+ ["Penulis puisi disebut...",["Penyair","Pelukis","Penyanyi","Penari"],0],
+ ["Cerita dengan tokoh hewan disebut...",["Legenda","Fabel","Biografi","Pantun"],1],
+ ["Kalimat perintah disebut...",["Berita","Tanya","Imperatif","Pasif"],2],
+ ["Kata baku yang benar...",["Resiko","Risiko","Resikko","Resikho"],1],
+ ["Pantun biasanya terdiri dari berapa baris?",["2","3","4","5"],2],
+ ["Pesan dalam cerita disebut...",["Latar","Tokoh","Alur","Amanat"],3]
+ ]
+},
+{
+ name:"Matematika",icon:"➗",
+ questions:[
+ ["7 × 8 = ...",["54","56","64","48"],1],
+ ["45 + 27 = ...",["62","72","82","71"],1],
+ ["100 − 36 = ...",["64","66","74","54"],0],
+ ["Setengah dari 80 adalah...",["20","30","40","50"],2],
+ ["Bangun dengan tiga sisi...",["Persegi","Segitiga","Lingkaran","Persegi panjang"],1],
+ ["9² = ...",["18","72","81","99"],2],
+ ["Jika x + 5 = 12, x = ...",["5","6","7","8"],2],
+ ["Keliling persegi sisi 6 cm...",["12 cm","24 cm","36 cm","18 cm"],1],
+ ["3/4 + 1/4 = ...",["1/2","1","4/8","3/8"],1],
+ ["1 kilometer sama dengan...",["10 m","100 m","1.000 m","10.000 m"],2]
+ ]
+},
+{
+ name:"PJOK",icon:"⚽",
+ questions:[
+ ["Sebelum olahraga lakukan...",["Pendinginan","Pemanasan","Tidur","Makan banyak"],1],
+ ["Sepak bola terutama menggunakan...",["Tangan","Kaki","Tongkat","Raket"],1],
+ ["Pemain inti sepak bola satu tim...",["5","6","11","12"],2],
+ ["Latihan daya tahan jantung...",["Joging","Membaca","Menggambar","Duduk"],0],
+ ["Memantulkan bola basket sambil berjalan...",["Servis","Dribel","Smash","Sundulan"],1],
+ ["Alat memukul kok bulu tangkis...",["Bet","Tongkat","Raket","Pemukul kayu"],2],
+ ["Setelah olahraga sebaiknya...",["Pemanasan","Pendinginan","Langsung tidur","Berlari cepat"],1],
+ ["Olahraga untuk melatih kelenturan...",["Peregangan","Tidur","Duduk","Membaca"],0],
+ ["Jumlah pemain voli di lapangan satu tim...",["5","6","7","11"],1],
+ ["Servis digunakan untuk...",["Memulai permainan","Mengakhiri sekolah","Menghentikan waktu","Mengganti pemain"],0]
+ ]
+},
+{
+ name:"Sejarah",icon:"🏛️",
+ questions:[
+ ["Indonesia merdeka pada...",["1 Juni 1945","17 Agustus 1945","10 November 1945","20 Mei 1908"],1],
+ ["Pembaca teks Proklamasi...",["Mohammad Hatta","Soekarno","Ki Hajar Dewantara","Jenderal Sudirman"],1],
+ ["Pengetik naskah Proklamasi...",["Sayuti Melik","Ahmad Soebardjo","Sutan Sjahrir","Mohammad Yamin"],0],
+ ["Budi Utomo berdiri tahun...",["1908","1928","1945","1965"],0],
+ ["Sumpah Pemuda diperingati...",["2 Mei","20 Mei","28 Oktober","10 November"],2],
+ ["Kerajaan Buddha di Sumatra...",["Majapahit","Sriwijaya","Demak","Mataram Islam"],1],
+ ["Borobudur merupakan candi agama...",["Hindu","Buddha","Islam","Konghucu"],1],
+ ["Hari Pahlawan diperingati...",["10 November","17 Agustus","21 April","1 Oktober"],0],
+ ["VOC didirikan oleh...",["Portugis","Belanda","Inggris","Spanyol"],1],
+ ["Rengasdengklok terjadi menjelang...",["Sumpah Pemuda","Proklamasi","Reformasi","Konferensi Asia Afrika"],1]
+ ]
+},
+{
+ name:"PABP",icon:"🕌",
+ questions:[
+ ["Kitab suci umat Islam...",["Weda","Al-Qur'an","Tripitaka","Injil"],1],
+ ["Rukun Islam berjumlah...",["3","4","5","6"],2],
+ ["Berkata sesuai kenyataan disebut...",["Jujur","Iri","Sombong","Malas"],0],
+ ["Menghormati perbedaan agama disebut...",["Toleransi","Egois","Dengki","Acuh"],0],
+ ["Menjaga kebersihan merupakan sikap...",["Baik","Sombong","Malas","Iri"],0],
+ ["Membantu orang lain disebut...",["Tolong-menolong","Mengejek","Bertengkar","Mengabaikan"],0],
+ ["Contoh perilaku amanah...",["Menjaga titipan","Berbohong","Ingkar janji","Mengambil milik orang"],0],
+ ["Berterima kasih menunjukkan rasa...",["Syukur","Marah","Iri","Sombong"],0],
+ ["Saling menghormati menjaga...",["Kerukunan","Permusuhan","Perselisihan","Kekacauan"],0],
+ ["Jika melakukan kesalahan sebaiknya...",["Menyalahkan orang","Mengakui dan meminta maaf","Berpura-pura","Mengulanginya"],1]
+ ]
+},
+{
+ name:"Basis Data",icon:"🗄️",
+ questions:[
+ ["Kepanjangan DBMS...",["Database Management System","Data Backup Main Server","Digital Base Memory","Database Manual Software"],0],
+ ["SQL digunakan untuk...",["Mengelola basis data","Mengedit video","Menggambar","Mengatur suara"],0],
+ ["Perintah mengambil data...",["GET","SELECT","OPEN","PULL"],1],
+ ["Primary key berfungsi untuk...",["Identifikasi baris unik","Menggandakan tabel","Menghapus database","Mengubah warna"],0],
+ ["Foreign key digunakan untuk...",["Menghubungkan tabel","Mengubah font","Membuat gambar","Mematikan komputer"],0],
+ ["Perintah menambahkan data...",["INSERT INTO","ADD ROWS","NEW DATA","MAKE"],0],
+ ["Perintah mengubah data...",["CHANGE","UPDATE","REPLACE ALL","EDIT TABLE"],1],
+ ["Perintah menghapus baris...",["REMOVE","CLEAR","DELETE","DROP ROW"],2],
+ ["Data dalam baris dan kolom disebut...",["Tabel","Folder","Slide","Browser"],0],
+ ["Klausa menyaring data berdasarkan kondisi...",["ORDER BY","WHERE","GROUP","INTO"],1]
+ ]
+},
+{
+ name:"KIK",icon:"🎨",
+ questions:[
+ ["Tujuan membuat produk kreatif...",["Menyelesaikan kebutuhan dengan ide baru","Meniru produk","Mengurangi fungsi","Tanpa tujuan"],0],
+ ["Langkah awal membuat produk...",["Memahami kebutuhan pengguna","Langsung menjual","Membuat iklan","Menentukan harga tanpa riset"],0],
+ ["Logo berfungsi sebagai...",["Identitas merek","Pengganti semua informasi","Ukuran barang","Biaya produksi"],0],
+ ["Target pasar adalah...",["Kelompok calon konsumen","Tempat alat","Jumlah bahan","Nama desainer"],0],
+ ["Desain sebaiknya disesuaikan dengan...",["Tujuan dan pengguna","Tren saja","Pesaing saja","Pilihan acak"],0],
+ ["Hak cipta melindungi...",["Karya pencipta","Semua ide umum","Barang yang belum dibuat","Harga barang"],0],
+ ["Contoh promosi digital...",["Promosi produk di media sosial","Menyimpan produk","Menghitung alat","Merapikan meja"],0],
+ ["Prototipe adalah...",["Model awal produk","Produk yang selalu sudah dijual","Laporan keuangan","Daftar pelanggan"],0],
+ ["Kemasan produk berguna untuk...",["Melindungi dan memberi informasi","Menambah berat saja","Menyulitkan produk","Mengganti fungsi"],0],
+ ["Umpan balik pelanggan berguna untuk...",["Memperbaiki produk","Mengabaikan pengguna","Menghentikan inovasi","Mengurangi informasi"],0]
+ ]
+}
+];
+
+const $ = id => document.getElementById(id);
+let current = null;
+let questions = [];
+let index = 0;
+let score = 0;
+let locked = false;
+let dailySeed = new Date().toISOString().slice(0,10)
+  .split("-").join("");
+
+function showPage(id){
+  document.querySelectorAll(".screen")
+    .forEach(s=>s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+function showSubjects(){
+  showPage("subjects");
+}
+
+function shuffle(array, seed){
+  let a = array.slice();
+  let x = Number(seed) || 1;
+
+  for(let i=a.length-1;i>0;i--){
+    x = (Math.imul(x,1664525)+1013904223)>>>0;
+    let j=x%(i+1);
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function buildSubjects(){
+  $("subjectGrid").innerHTML = "";
+
+  subjects.forEach((subject,i)=>{
+    const button = document.createElement("button");
+    button.className = "subject";
+    button.innerHTML = `
+      <span class="icon">${subject.icon}</span>
+      <span><b>${subject.name}</b>
+      <small>10 soal • Maks. 100 poin</small></span>
+    `;
+
+    button.onclick = ()=>startQuiz(i);
+    $("subjectGrid").appendChild(button);
+  });
+}
+
+function startQuiz(i){
+  current = subjects[i];
+  questions = shuffle(current.questions, Number(dailySeed)+i*997);
+  index = 0;
+  score = 0;
+  showPage("quiz");
+  renderQuestion();
+}
+
+function renderQuestion(){
+  locked = false;
+  const q = questions[index];
+
+  $("subjectName").textContent = current.icon+" "+current.name;
+  $("count").textContent = `Soal ${index+1} dari 10`;
+  $("fill").style.width = `${index/10*100}%`;
+  $("question").textContent = q[0];
+  $("answers").innerHTML = "";
+  $("feedback").className = "feedback";
+  $("feedback").textContent = "";
+  $("next").disabled = true;
+  $("next").textContent = index===9 ? "Lihat Hasil →" : "Selanjutnya →";
+
+  const choices = shuffle(
+    q[1].map((text,i)=>({text,correct:i===q[2]})),
+    Number(dailySeed)+index*17+current.name.length
+  );
+
+  choices.forEach((choice,i)=>{
+    const button = document.createElement("button");
+    button.className = "answer";
+    button.innerHTML = `<b>${"ABCD"[i]}.</b> ${choice.text}`;
+    button.onclick = ()=>selectAnswer(choice,button);
+    $("answers").appendChild(button);
+  });
+}
+
+function selectAnswer(choice,button){
+  if(locked)return;
+  locked = true;
+
+  document.querySelectorAll(".answer").forEach(b=>b.disabled=true);
+  button.classList.add(choice.correct ? "correct" : "wrong");
+
+  if(choice.correct)score+=10;
+
+  const q = questions[index];
+  $("feedback").textContent =
+    (choice.correct ? "✅ Benar! " : "💡 Belum tepat! ") +
+    "Jawaban yang benar: " + q[1][q[2]];
+
+  $("feedback").className = "feedback show";
+  $("fill").style.width = `${(index+1)/10*100}%`;
+  $("next").disabled = false;
+}
+
+function finishQuiz(){
+  showPage("result");
+  $("score").textContent = score+"/100";
+  $("trophy").textContent = score===100 ? "🏆" : score>=70 ? "🎉" : "💪";
+  $("resultTitle").textContent =
+    score===100 ? "Sempurna!" : score>=70 ? "Kerja bagus!" : "Terus berlatih!";
+  $("resultText").textContent =
+    `Kamu menyelesaikan 10 soal ${current.name} dan mendapat ${score} poin. Sekarang kamu bisa memilih mapel lain.`;
+}
+
+function retryQuiz(){
+  startQuiz(subjects.indexOf(current));
+}
+
+$("next").onclick = ()=>{
+  if(!locked)return;
+
+  if(index<9){
+    index++;
+    renderQuestion();
+  }else{
+    finishQuiz();
+  }
+};
+
+buildSubjects();
+</script>
+</body>
+</html>
